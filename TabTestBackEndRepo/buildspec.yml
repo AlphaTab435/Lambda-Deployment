@@ -1,0 +1,14 @@
+version: 0.2
+
+phases:
+  build:
+    commands:
+      # - echo "TurboInside"
+      - cd TabTestBackEndRepo
+      - pip install -r requirements.txt -t .
+      - aws cloudformation package --template-file template.yml --output-template-file template-out.yml --s3-bucket gokcedb-test-bucket-tab
+artifacts:
+  files:
+    - template.yml
+    - template-out.yml
+  base-directory: TabTestBackEndRepo

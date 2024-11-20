@@ -1,0 +1,447 @@
+# SAMBackendTestStack 
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Template for GokceDB backend"
+
+Parameters:
+    StackName:
+      Type: String
+      Default: SubStack
+
+    ChangeSetName:
+      Type: String
+      Default: SubStackChageset
+
+    Region:
+        Type: String
+        Default: us-east-1
+
+    AccountId:
+        Description: Aws account id
+        Type: String
+
+    s3BucketName:
+        Type: String
+
+    UniqueResourceName:
+      Description: The name will be used for CodePipeLine, CodeBuild, Roles and policies
+      Type: String
+      Default: SAMBackend
+
+    BitBucketConnection:
+        Description: CodeStarSourceConnection or CodeConnection For Bitbucket So it can be connected to code pipeline
+        Type: String
+
+
+    RepositoryIdForBitbuckte:
+        Description: Workspace/Repository
+        Type: String
+    
+    RepoBranchName:
+        Description: Branch name of bitbucket repo
+        Type: String
+
+  
+
+
+Resources:
+
+    IAMManagedPolicyForCodePipeline:
+      Type: AWS::IAM::ManagedPolicy
+      Properties:
+        ManagedPolicyName: !Sub "AWSCodePipelineServiceRole-us-east-1-${UniqueResourceName}Pieline"
+        PolicyDocument: {
+        "Statement": [
+          {
+              "Action": [
+                  "iam:PassRole"
+              ],
+              "Resource": "*",
+              "Effect": "Allow",
+              "Condition": {
+                  "StringEqualsIfExists": {
+                      "iam:PassedToService": [
+                          "cloudformation.amazonaws.com",
+                          "elasticbeanstalk.amazonaws.com",
+                          "ec2.amazonaws.com",
+                          "ecs-tasks.amazonaws.com"
+                      ]
+                  }
+              }
+          },
+          {
+              "Action": [
+                  "codecommit:CancelUploadArchive",
+                  "codecommit:GetBranch",
+                  "codecommit:GetCommit",
+                  "codecommit:GetRepository",
+                  "codecommit:GetUploadArchiveStatus",
+                  "codecommit:UploadArchive"
+              ],
+              "Resource": "*",
+              "Effect": "Allow"
+          },
+          {
+              "Action": [
+                  "codedeploy:CreateDeployment",
+                  "codedeploy:GetApplication",
+                  "codedeploy:GetApplicationRevision",
+                  "codedeploy:GetDeployment",
+                  "codedeploy:GetDeploymentConfig",
+                  "codedeploy:RegisterApplicationRevision"
+              ],
+              "Resource": "*",
+              "Effect": "Allow"
+          },
+          {
+              "Action": [
+                  "codestar-connections:UseConnection"
+              ],
+              "Resource": "*",
+              "Effect": "Allow"
+          },
+          {
+              "Action": [
+                  "elasticbeanstalk:*",
+                  "ec2:*",
+                  "elasticloadbalancing:*",
+                  "autoscaling:*",
+                  "cloudwatch:*",
+                  "s3:*",
+                  "sns:*",
+                  "cloudformation:*",
+                  "rds:*",
+                  "sqs:*",
+                  "ecs:*"
+              ],
+              "Resource": "*",
+              "Effect": "Allow"
+          },
+          {
+              "Action": [
+                  "lambda:InvokeFunction",
+                  "lambda:ListFunctions"
+              ],
+              "Resource": "*",
+              "Effect": "Allow"
+          },
+          {
+              "Action": [
+                  "opsworks:CreateDeployment",
+                  "opsworks:DescribeApps",
+                  "opsworks:DescribeCommands",
+                  "opsworks:DescribeDeployments",
+                  "opsworks:DescribeInstances",
+                  "opsworks:DescribeStacks",
+                  "opsworks:UpdateApp",
+                  "opsworks:UpdateStack"
+              ],
+              "Resource": "*",
+              "Effect": "Allow"
+          },
+          {
+              "Action": [
+                  "cloudformation:CreateStack",
+                  "cloudformation:DeleteStack",
+                  "cloudformation:DescribeStacks",
+                  "cloudformation:UpdateStack",
+                  "cloudformation:CreateChangeSet",
+                  "cloudformation:DeleteChangeSet",
+                  "cloudformation:DescribeChangeSet",
+                  "cloudformation:ExecuteChangeSet",
+                  "cloudformation:SetStackPolicy",
+                  "cloudformation:ValidateTemplate"
+              ],
+              "Resource": "*",
+              "Effect": "Allow"
+          },
+          {
+              "Action": [
+                  "codebuild:BatchGetBuilds",
+                  "codebuild:StartBuild",
+                  "codebuild:BatchGetBuildBatches",
+                  "codebuild:StartBuildBatch"
+              ],
+              "Resource": "*",
+              "Effect": "Allow"
+          },
+          {
+              "Effect": "Allow",
+              "Action": [
+                  "devicefarm:ListProjects",
+                  "devicefarm:ListDevicePools",
+                  "devicefarm:GetRun",
+                  "devicefarm:GetUpload",
+                  "devicefarm:CreateUpload",
+                  "devicefarm:ScheduleRun"
+              ],
+              "Resource": "*"
+          },
+          {
+              "Effect": "Allow",
+              "Action": [
+                  "servicecatalog:ListProvisioningArtifacts",
+                  "servicecatalog:CreateProvisioningArtifact",
+                  "servicecatalog:DescribeProvisioningArtifact",
+                  "servicecatalog:DeleteProvisioningArtifact",
+                  "servicecatalog:UpdateProduct"
+              ],
+              "Resource": "*"
+          },
+          {
+              "Effect": "Allow",
+              "Action": [
+                  "cloudformation:ValidateTemplate"
+              ],
+              "Resource": "*"
+          },
+          {
+              "Effect": "Allow",
+              "Action": [
+                  "ecr:DescribeImages"
+              ],
+              "Resource": "*"
+          },
+          {
+              "Effect": "Allow",
+              "Action": [
+                  "states:DescribeExecution",
+                  "states:DescribeStateMachine",
+                  "states:StartExecution"
+              ],
+              "Resource": "*"
+          },
+          {
+              "Effect": "Allow",
+              "Action": [
+                  "appconfig:StartDeployment",
+                  "appconfig:StopDeployment",
+                  "appconfig:GetDeployment"
+              ],
+              "Resource": "*"
+          }
+        ],
+        "Version": "2012-10-17"
+      } 
+    
+    IAMRoleForCodePipeline:
+      DependsOn: IAMManagedPolicyForCodePipeline
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: !Sub "AWSCodePipelineServiceRole-us-east-1-${UniqueResourceName}Pipeline"
+        Description: RoleForCodePipeLine
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - "codepipeline.amazonaws.com"
+              Action:
+                - "sts:AssumeRole"
+        # Focus
+        ManagedPolicyArns:
+        #   - !Sub "arn:aws:iam::${AWS::AccountId}:policy/AWSCodePipelineServiceRole-us-east-1-${UniqueResourceName}Pieline"
+            - !Ref IAMManagedPolicyForCodePipeline
+        MaxSessionDuration: 3600    
+    
+    
+    IAMManagedPolicyForCodeBuildRole:
+      Type: AWS::IAM::ManagedPolicy
+      Properties:
+        ManagedPolicyName: !Sub "CodeBuildBasePolicy-${UniqueResourceName}CodeBuild-us-east-1"
+        PolicyDocument: {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "VisualEditor0",
+                    "Effect": "Allow",
+                    "Action": [
+                        "codebuild:CreateReportGroup",
+                        "codebuild:CreateReport",
+                        "s3:PutObject",
+                        "s3:GetObject",
+                        "logs:CreateLogStream",
+                        "codebuild:UpdateReport",
+                        "codebuild:BatchPutCodeCoverages",
+                        "codebuild:BatchPutTestCases",
+                        "logs:CreateLogGroup",
+                        "logs:PutLogEvents",
+                        "s3:GetObjectVersion"
+                    ],
+                    "Resource": [
+                        !Sub "arn:aws:codebuild:${Region}:${AccountId}:report-group/${UniqueResourceName}CodeBuild-*",
+                        !Sub "arn:aws:logs:${Region}:${AccountId}:log-group:/aws/codebuild/${UniqueResourceName}CodeBuild",
+                        !Sub "arn:aws:logs:${Region}:${AccountId}:log-group:/aws/codebuild/${UniqueResourceName}CodeBuild:*",
+                        !Sub "arn:aws:s3:::${s3BucketName}/*"
+                    ]
+                }
+            ]
+        }
+    
+    IAMRoleForCodeBuild:
+      DependsOn: IAMManagedPolicyForCodeBuildRole
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: !Sub "${UniqueResourceName}CodeBuildRole"
+        Description: RoleForCodeBuild
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - "codebuild.amazonaws.com"
+              Action:
+                - "sts:AssumeRole"
+        # Focus
+        ManagedPolicyArns:
+        #   - !Sub "arn:aws:iam::${AWS::AccountId}:policy/CodeBuildBasePolicy-${UniqueResourceName}CodeBuild-us-east-1"
+          - !Ref IAMManagedPolicyForCodeBuildRole
+        MaxSessionDuration: 3600    
+    
+    IAMRoleForCloudFormation:
+        Type: AWS::IAM::Role
+        Properties:
+          RoleName: !Sub "${UniqueResourceName}CloudFormationRole"
+          Description: RoleForCloudFormation
+          AssumeRolePolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Principal:
+                  Service:
+                    - "cloudformation.amazonaws.com"
+                Action:
+                  - "sts:AssumeRole"
+          # Focus
+          ManagedPolicyArns:
+            - arn:aws:iam::aws:policy/AmazonAPIGatewayAdministrator
+            - arn:aws:iam::aws:policy/AmazonS3FullAccess
+            - arn:aws:iam::aws:policy/AWSCloudFormationFullAccess
+            - arn:aws:iam::aws:policy/AWSLambda_FullAccess
+            - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+            - arn:aws:iam::aws:policy/IAMFullAccess
+          MaxSessionDuration: 3600   
+
+    CodeBuildForCodePipeline:
+        Type: AWS::CodeBuild::Project
+        DependsOn: IAMRoleForCodeBuild
+        Properties:
+            Name: !Sub "${UniqueResourceName}CodeBuild"
+            Description: A description about my project
+            Artifacts:
+              Type: CODEPIPELINE
+            Environment:
+              Type: LINUX_CONTAINER  # Corrected this line
+              ComputeType: BUILD_GENERAL1_SMALL  # Use BUILD_GENERAL1_SMALL, BUILD_GENERAL1_MEDIUM, or BUILD_GENERAL1_LARGE
+              Image: "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
+            Source:
+              Type: CODEPIPELINE
+              BuildSpec: "TabTestBackEndRepo/buildspec.yml"
+            TimeoutInMinutes: 10
+            ServiceRole: !Ref IAMRoleForCodeBuild
+
+    
+    MyCodePipeline:
+      Type: "AWS::CodePipeline::Pipeline"
+      DependsOn: 
+        - IAMRoleForCodePipeline
+        - CodeBuildForCodePipeline
+        - IAMRoleForCloudFormation
+      Properties:
+        Name: !Sub "${UniqueResourceName}Pipeline"
+        PipelineType: V2
+        ArtifactStore: 
+            Location: !Ref s3BucketName
+            Type: S3
+        RestartExecutionOnUpdate: False
+        RoleArn: !GetAtt IAMRoleForCodePipeline.Arn
+        Stages:
+            -   Name: Source
+                Actions: 
+                    -   Name: Source
+                        ActionTypeId: 
+                            Category: Source
+                            Owner: AWS
+                            Provider: CodeStarSourceConnection
+                            Version: '1'
+                        Configuration: 
+                            ConnectionArn: !Ref BitBucketConnection 
+                            FullRepositoryId: !Ref RepositoryIdForBitbuckte 
+                            BranchName: !Ref RepoBranchName
+                        OutputArtifacts:
+                            - Name: SourceArtifact
+            -   Name: Build
+                Actions: 
+                    -   Name: Build
+                        ActionTypeId: 
+                            Category: Build
+                            Owner: AWS
+                            Provider: CodeBuild
+                            Version: '1'
+                        Configuration: 
+                          ProjectName: !Ref CodeBuildForCodePipeline
+                        InputArtifacts: 
+                          - Name: SourceArtifact
+                        OutputArtifacts: 
+                          - Name: BuildArtifact
+            -   Name: Deploy
+                Actions: 
+                    -   Name: Deploy
+                        RunOrder: 1
+                        Namespace: DeployVariables
+                        ActionTypeId: 
+                            Category: Deploy
+                            Owner: AWS
+                            Provider: CloudFormation
+                            Version: '1'
+                        Configuration: 
+                          ActionMode: CHANGE_SET_REPLACE
+                          StackName: !Ref StackName
+                          Capabilities: CAPABILITY_IAM
+                          ChangeSetName : !Ref ChangeSetName
+                          RoleArn: !GetAtt IAMRoleForCloudFormation.Arn
+                          TemplatePath: BuildArtifact::template-out.yml
+                        InputArtifacts: 
+                          - Name: BuildArtifact
+                    
+                    -   Name: ExecuteChangeSet
+                        RunOrder: 2
+                        ActionTypeId: 
+                            Category: Deploy
+                            Owner: AWS
+                            Provider: CloudFormation
+                            Version: '1'
+                        Configuration: 
+                          ActionMode: CHANGE_SET_EXECUTE
+                          StackName: !Ref StackName
+                        #   Capabilities: CAPABILITY_IAM
+                          ChangeSetName : !Ref ChangeSetName
+                        #   RoleArn: !GetAtt IAMRoleForCloudFormation.Arn
+                        #   TemplatePath: BuildArtifact::template-out.yml
+                        InputArtifacts: 
+                          - Name: BuildArtifact
+                        OutputArtifacts: 
+                          - Name: ExcecuteChangeSetOutput
+                          
+                          
+
+        Triggers:
+            -   GitConfiguration: 
+                    Push: 
+                        -   Branches: 
+                                Includes: [!Ref RepoBranchName]
+                    SourceActionName: Source
+                ProviderType: CodeStarSourceConnection
+
+     
+Outputs:
+  CodePipelineRoleArn:
+    Description: "The ARN of the IAM Role for CodePipeline"
+    Value: !GetAtt IAMRoleForCodePipeline.Arn
+  CodePipelineRoleArn2:
+    Description: "The ARN of the IAM Role for CodePipeline"
+    Value: !Ref IAMRoleForCodePipeline
+#    Following is for making values available to other cloudformation stacks
+    # Export:
+    #   Name: !Sub "${AWS::StackName}-CodePipelineRoleArn"
